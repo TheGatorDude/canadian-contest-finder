@@ -2,33 +2,38 @@ import streamlit as st
 
 st.set_page_config(page_title="Canadian Contest Finder", layout="wide")
 
-# You had the contest data hardcoded or in a text file
-contests = [
-    {
-        "name": "RW&CO Canada Contest",
-        "description": "Win a $100 Gift Card for Spring!",
-        "url": "https://www.canadianfreestuff.com/rwco-canada-contest/"
-    },
-    {
-        "name": "Costco Canada Contest",
-        "description": "Win 1 of two $100 Gift Cards!",
-        "url": "https://www.canadianfreestuff.com/costco-canada-contest/"
-    },
-    {
-        "name": "Best Buy Canada",
-        "description": "Win a $2500 Gift Card in the 25th Anniversary Contest!",
-        "url": "https://www.canadianfreestuff.com/best-buy-canada-contest/"
-    },
-    {
-        "name": "Huggies Canada Contest",
-        "description": "Win a 6-mo supply of Diapers & Wipes + $500 Amazon gift card!",
-        "url": "https://www.canadianfreestuff.com/huggies-canada-contest/"
-    },
-    # …add all 50+ contests here
-]
+# Example: loading contests from a text file
+# Format in file: name|description|url
+# You can replace 'canada_contests_all_sites.txt' with your own source
+def load_contests(file_path="canada_contests_all_sites.txt"):
+    contests = []
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or "|" not in line:
+                    continue
+                name, description, url = line.split("|")
+                contests.append({"name": name.strip(), "description": description.strip(), "url": url.strip()})
+    except FileNotFoundError:
+        st.error(f"Contest source file not found: {file_path}")
+    return contests
+
+# Remove duplicates by contest name
+def deduplicate_contests(contests):
+    seen = set()
+    deduped = []
+    for c in contests:
+        if c["name"] not in seen:
+            deduped.append(c)
+            seen.add(c["name"])
+    return deduped
+
+contests = load_contests()
+contests = deduplicate_contests(contests)
 
 st.title("🎯 Canadian Contest Finder")
 st.write(f"Found {len(contests)} Canadian contests:")
 
-for c in contests:
-    st.markdown(f"• [{c['name']}]({c['url']})  \n{c['description']}")
+for contest in contests:
+    st.markdown(f"• [{contest['name']}]({contest['url']})  \n{contest['description']}")
