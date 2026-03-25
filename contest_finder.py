@@ -1,39 +1,76 @@
 import streamlit as st
 import pandas as pd
 
-# --- Example data ---
-contests = [
-    {"name": "RW&CO Canada Contest", "description": "Win a $100 Gift Card for Spring!", "url": "https://www.canadianfreestuff.com/rwco-canada-contest/", "category": "Gift Card", "priority": 2},
-    {"name": "Budweiser Canada Contest", "description": "Win a Trip to the 2026 Stanley Cup Final", "url": "https://www.canadianfreestuff.com/budweiser-canada-contest/", "category": "Travel", "priority": 5},
-    {"name": "Apple iPhone Contest Canada", "description": "Win a New Apple Watch Series 11", "url": "https://www.canadianfreestuff.com/apple-canada-contest/", "category": "Electronics", "priority": 4},
-    # ... add all your contests here
+# -----------------------------
+# Sample contest data
+# -----------------------------
+data = [
+    {
+        "name": "RW&CO Canada Contest",
+        "description": "Win a $100 Gift Card for Spring!",
+        "url": "https://www.canadianfreestuff.com/rwco-canada-contest/",
+        "priority": 2,
+        "category": "Shopping"
+    },
+    {
+        "name": "Budweiser Canada Contest",
+        "description": "Win a Trip to the 2026 Stanley Cup Final",
+        "url": "https://www.canadianfreestuff.com/budweiser-canada-contest/",
+        "priority": 5,
+        "category": "Travel"
+    },
+    {
+        "name": "Apple iPhone Contest Canada",
+        "description": "Win a New Apple Watch Series 11",
+        "url": "https://www.canadianfreestuff.com/apple-canada-contest/",
+        "priority": 4,
+        "category": "Electronics"
+    },
+    # Add more contests here...
 ]
 
-df = pd.DataFrame(contests)
+# Convert to DataFrame
+df = pd.DataFrame(data)
 
+# -----------------------------
+# Sidebar filters
+# -----------------------------
+st.sidebar.header("Filter Contests")
+
+# Search box (optional)
+search = st.sidebar.text_input("Search contests (name or description)")
+
+# Priority filter
+priority_filter = st.sidebar.slider("Minimum Priority", min_value=1, max_value=5, value=1)
+
+# Category filter (optional)
+categories = list(df['category'].unique())
+category_filter = st.sidebar.multiselect("Categories", categories, default=categories)
+
+# -----------------------------
+# Filtering logic
+# -----------------------------
+filtered_df = df.copy()
+
+# Filter by search term if provided
+if search:
+    filtered_df = filtered_df[
+        filtered_df['name'].str.contains(search, case=False) |
+        filtered_df['description'].str.contains(search, case=False)
+    ]
+
+# Filter by priority
+filtered_df = filtered_df[filtered_df['priority'] >= priority_filter]
+
+# Filter by category (only if selected)
+if category_filter:
+    filtered_df = filtered_df[filtered_df['category'].isin(category_filter)]
+
+# -----------------------------
+# Display contests
+# -----------------------------
 st.title("🎯 Canadian Contest Finder")
-st.markdown("Find the best Canadian contests with links, descriptions, and priority scores!")
+st.write(f"Found {len(filtered_df)} contests:")
 
-# --- Filters ---
-search = st.text_input("Search contests (keywords):")
-category_filter = st.multiselect("Filter by category:", options=df['category'].unique(), default=df['category'].unique())
-priority_filter = st.slider("Minimum priority:", 1, 5, 1)
-
-# --- Filter dataframe ---
-filtered_df = df[
-    df['name'].str.contains(search, case=False) &
-    df['category'].isin(category_filter) &
-    (df['priority'] >= priority_filter)
-]
-
-# --- Optional refresh button ---
-if st.button("🔄 Refresh Data"):
-    st.info("Refreshing data... (for now this just reloads the static list)")
-    # Here you could call your scraping function to update df
-
-# --- Display contests ---
 for _, row in filtered_df.iterrows():
     st.markdown(f"• [{row['name']}]({row['url']})  \n{row['description']}  \nPriority: {row['priority']}")
-
-# --- Optional: show total count ---
-st.markdown(f"**Total contests shown:** {len(filtered_df)}")
