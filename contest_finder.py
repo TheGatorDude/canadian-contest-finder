@@ -1,83 +1,70 @@
-import requests
+# contest_finder.py
 import streamlit as st
-import pandas as pd
-
-st.set_page_config(page_title="🎯 Canadian Contest Finder", layout="wide")
 
 st.title("🎯 Canadian Contest Finder")
-st.markdown("Find Canadian contests across multiple sources with priority scoring!")
 
-# Keywords for high-priority contests
-priority_keywords = ["cash", "gift card", "trip", "vacation", "electronics", "laptop", "phone", "watch", "voucher", "prize", "tablet", "TV", "air miles"]
+# Full list of 57 contests with name and URL
+contests = [
+    ("RW&CO Canada Contest", "https://www.canadianfreestuff.com/rwco-canada-contest/"),
+    ("Costco Canada Contest", "https://www.canadianfreestuff.com/costco-canada-contest/"),
+    ("Best Buy Canada Contest", "https://www.canadianfreestuff.com/best-buy-canada-contest/"),
+    ("Huggies Canada Contest", "https://www.canadianfreestuff.com/huggies-canada-contest/"),
+    ("Linen Chest Canada Contest", "https://www.canadianfreestuff.com/linen-chest-canada-contest/"),
+    ("Milestones Canada Contest", "https://www.canadianfreestuff.com/milestones-canada-free-sample/"),
+    ("Home Depot Canada Contest", "https://www.canadianfreestuff.com/home-depot-canada-contest/"),
+    ("HomeSense Canada Contest", "https://www.canadianfreestuff.com/homesense-contest/"),
+    ("Nerds Gummy Clusters Canada Contest", "https://www.canadianfreestuff.com/nerds-canada-contest/"),
+    ("Budweiser Canada Contest", "https://www.canadianfreestuff.com/budweiser-canada-contest/"),
+    ("Visa Contest Canada", "https://www.canadianfreestuff.com/visa-contest-win-visa-gift-card-canada/"),
+    ("Dole Contest Canada", "https://www.canadianfreestuff.com/dole-canada-contest/"),
+    ("Old Dutch Discover Canada Contest", "https://www.contestscoop.com/old-dutch-canada-contest/"),
+    ("Sleep Country Contest", "https://www.canadianfreestuff.com/sleep-country-contest/"),
+    ("Parents Canada Contest", "https://www.canadianfreestuff.com/parents-canada-contests/"),
+    ("Old Dutch Discover Canada Contest 2", "https://www.canadianfreestuff.com/old-dutch-canada-contest/"),
+    ("Canadian Woodworking Contest", "https://www.canadianfreestuff.com/canadian-woodworking-contest/"),
+    ("Avon Canada Contest", "https://www.canadianfreestuff.com/avon-canada-contest/"),
+    ("Air Miles Canada Contest", "https://www.canadianfreestuff.com/air-miles-canada-contest/"),
+    ("Molson Canadian Contest", "https://www.canadianfreestuff.com/molson-canadian-contest/"),
+    ("Glad Canada Contest Instagram", "https://www.contestscoop.com/glad-canada-contest/"),
+    ("Glad Canada Contest Instagram/Facebook", "https://www.contestscoop.com/glad-canada-contest/"),
+    ("Canada's Luckiest Family Contest", "https://www.contestscoop.com/canadas-luckiest-family-contest/"),
+    ("Clearly Canadian Contest", "https://www.canadianfreestuff.com/clearly-canadian-contest/"),
+    ("Staples Canada Contest", "https://www.canadianfreestuff.com/staples-canada-contest/"),
+    ("Android Contest Canada", "https://www.canadianfreestuff.com/android-canada-contest/"),
+    ("Apple iPhone Contest Canada", "https://www.canadianfreestuff.com/apple-canada-contest/"),
+    ("Aeroplan Canada Contest", "https://www.canadianfreestuff.com/aeroplan-canada-contest/"),
+    ("Cineplex Canada Contest", "https://www.canadianfreestuff.com/cineplex-canada-contest/"),
+    ("Philips Canada Contest", "https://www.canadianfreestuff.com/philips-canada-contest/"),
+    ("Kubota Canada BX Summer Contest", "https://www.canadianfreestuff.com/kubota-contest/"),
+    ("Cub Cadet Contest", "https://www.canadianfreestuff.com/cub-cadet-canada-contest/"),
+    ("Parent Life Network Contest", "https://www.canadianfreestuff.com/canada-luckiest-family-contest/"),
+    ("Kinder Contest Canada", "https://www.canadianfreestuff.com/kinder-canada-contests/"),
+    ("Conair Contest Canada", "https://www.canadianfreestuff.com/conair-canada-contest/"),
+    ("Mr. Lube Canada Contest", "https://www.canadianfreestuff.com/mr-lube-canada-contest/"),
+    ("Playstation Canada Contest", "https://www.canadianfreestuff.com/playstation-canada-contest/"),
+    ("Team Canada Contest", "https://www.canadianfreestuff.com/team-canada-contest/"),
+    ("Napoleon BBQ Canada Contest", "https://www.canadianfreestuff.com/napoleon-canada-contest/"),
+    ("Lindt Canada Easter Contest", "https://www.canadianfreestuff.com/lindt-canada-contest/"),
+    ("Telus Canada Contest", "https://www.canadianfreestuff.com/telus-canada-contest/"),
+    ("Rogers Canada Contest", "https://www.canadianfreestuff.com/rogers-canada-contest/"),
+    ("Aero Canada Contest", "https://www.canadianfreestuff.com/aero-canada-contest/"),
+    ("Scotties Contest Canada", "https://www.canadianfreestuff.com/scotties-canada-contest/"),
+    ("Dove Canada Contest", "https://www.canadianfreestuff.com/dove-canada-contest/"),
+    ("Fish’n Canada Contest", "https://www.canadianfreestuff.com/fish-n-canada-contest/"),
+    ("Tribute Contest Canada", "https://www.canadianfreestuff.com/tribute-canada-contest/"),
+    ("Orange Naturals Canada Contest", "https://www.canadianfreestuff.com/orange-naturals-magpop-free-sample/"),
+    ("Canada Dry Contest", "https://www.canadianfreestuff.com/canada-dry-contest/"),
+    ("Contest Scoop Canadian Contests", "https://www.contestscoop.com/canadian-contests/"),
+    ("Latest Canadian contests", "https://www.contestscoop.com/canadian-contests/"),
+    ("Popular Page Canada Contests", "https://www.contestscoop.com/canadian-contests/"),
+    ("Facebook Canada Contests", "https://www.contestscoop.com/facebook-contests/"),
+    ("Contest Scoop Directory", "https://www.contestscoop.com/"),
+    ("Canada Contests", "https://www.canadianfreestuff.com/canadian-contests/"),
+    ("Enter Daily Contests Canada", "https://www.canadianfreestuff.com/canadian-contests/enter-daily/"),
+]
 
-# User input filter
-filter_keyword = st.text_input("Filter contests by keyword (optional):").lower().strip()
+st.write(f"Found {len(contests)} Canadian contests:")
 
-# Sources to scrape
-sources = {
-    "Canadian Free Stuff": "https://www.canadianfreestuff.com/canadian-contests/",
-    "Contest Scoop": "https://www.contestscoop.com/canadian-contests/"
-}
-
-# Function to fetch contests from a URL
-def fetch_contests(url):
-    try:
-        response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
-        response.raise_for_status()
-        return response.text
-    except Exception as e:
-        st.warning(f"Failed to fetch from {url}: {e}")
-        return ""
-
-# Function to parse contests (simple text scraping)
-def parse_contests(text, source_name):
-    # This is a basic parsing: find all hyperlinks and their text
-    from bs4 import BeautifulSoup
-    soup = BeautifulSoup(text, "html.parser")
-    contests = []
-    for link in soup.find_all("a", href=True):
-        title = link.get_text(strip=True)
-        href = link["href"]
-        if title and "canada" in title.lower():
-            contests.append({
-                "Source": source_name,
-                "Title": title,
-                "Link": href
-            })
-    return contests
-
-# Collect all contests
-all_contests = []
-for name, url in sources.items():
-    html = fetch_contests(url)
-    all_contests.extend(parse_contests(html, name))
-
-# Apply filter if user entered one
-if filter_keyword:
-    all_contests = [c for c in all_contests if filter_keyword in c["Title"].lower()]
-
-# Compute priority score
-def score_contest(title):
-    score = sum(1 for kw in priority_keywords if kw in title.lower())
-    return score
-
-for c in all_contests:
-    c["Priority"] = score_contest(c["Title"])
-
-# Sort by priority
-all_contests.sort(key=lambda x: x["Priority"], reverse=True)
-
-# Display contests in a nice table
-if all_contests:
-    df = pd.DataFrame(all_contests)
-    df["Link"] = df.apply(lambda row: f"[Link]({row['Link']})", axis=1)
-    df = df[["Source", "Title", "Link", "Priority"]]
-    st.markdown(f"### Found {len(df)} Canadian contests:")
-    st.dataframe(df, use_container_width=True)
-else:
-    st.info("No contests found. Try changing the filter or check back later!")
-
-# Optional: save to a file
-if st.button("Save contests to CSV"):
-    pd.DataFrame(all_contests).to_csv("canadian_contests.csv", index=False)
-    st.success("Saved contests to canadian_contests.csv")
+# Show contests as clickable links
+for name, url in contests:
+    st.markdown(f"• [{name}]({url})")
