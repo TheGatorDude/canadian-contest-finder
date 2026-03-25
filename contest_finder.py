@@ -1,100 +1,83 @@
 import requests
-from datetime import datetime
-import os
+import streamlit as st
+import pandas as pd
 
-# Output file
-OUTPUT_FILE = "canada_contests_all_sites.txt"
-# Keep a set of existing URLs to avoid duplicates
-existing_urls = set()
+st.set_page_config(page_title="🎯 Canadian Contest Finder", layout="wide")
 
-# Load existing URLs if the file exists
-if os.path.exists(OUTPUT_FILE):
-    with open(OUTPUT_FILE, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line.startswith("http"):
-                existing_urls.add(line)
+st.title("🎯 Canadian Contest Finder")
+st.markdown("Find Canadian contests across multiple sources with priority scoring!")
 
-# Sites to scrape
-SITES = [
-    "https://www.canadianfreestuff.com/canadian-contests/",
-    "https://www.contestscoop.com/canadian-contests/",
-    "https://www.sweepstakes.ca/",
-    # Add more sources if desired
-]
+# Keywords for high-priority contests
+priority_keywords = ["cash", "gift card", "trip", "vacation", "electronics", "laptop", "phone", "watch", "voucher", "prize", "tablet", "TV", "air miles"]
 
-# Words to ignore
-BAD_KEYWORDS = [
-    "coupon", "coupons", "free samples", "magazine",
-    "browse", "category", "facebook contests",
-    "freebies", "print", "mail", "signup",
-    # Meta pages we want to ignore
-    "popular page", "latest canadian contests",
-    "trusted contest & giveaway directory",
-    "enter daily contests"
-]
+# User input filter
+filter_keyword = st.text_input("Filter contests by keyword (optional):").lower().strip()
 
-# Function to score contests by prize value
+# Sources to scrape
+sources = {
+    "Canadian Free Stuff": "https://www.canadianfreestuff.com/canadian-contests/",
+    "Contest Scoop": "https://www.contestscoop.com/canadian-contests/"
+}
+
+# Function to fetch contests from a URL
+def fetch_contests(url):
+    try:
+        response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
+        response.raise_for_status()
+        return response.text
+    except Exception as e:
+        st.warning(f"Failed to fetch from {url}: {e}")
+        return ""
+
+# Function to parse contests (simple text scraping)
+def parse_contests(text, source_name):
+    # This is a basic parsing: find all hyperlinks and their text
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(text, "html.parser")
+    contests = []
+    for link in soup.find_all("a", href=True):
+        title = link.get_text(strip=True)
+        href = link["href"]
+        if title and "canada" in title.lower():
+            contests.append({
+                "Source": source_name,
+                "Title": title,
+                "Link": href
+            })
+    return contests
+
+# Collect all contests
+all_contests = []
+for name, url in sources.items():
+    html = fetch_contests(url)
+    all_contests.extend(parse_contests(html, name))
+
+# Apply filter if user entered one
+if filter_keyword:
+    all_contests = [c for c in all_contests if filter_keyword in c["Title"].lower()]
+
+# Compute priority score
 def score_contest(title):
-    title = title.lower()
-    score = 0
-    if "$" in title:
-        score += 3
-    if "win" in title:
-        score += 2
-    if "trip" in title or "vacation" in title:
-        score += 5
-    if "gift card" in title:
-        score += 2
-    if "iphone" in title or "macbook" in title or "samsung" in title:
-        score += 4
-    if "cash" in title or "money" in title:
-        score += 5
-    if "luxury" in title or "expensive" in title:
-        score += 3
+    score = sum(1 for kw in priority_keywords if kw in title.lower())
     return score
 
-# Collect contests
-contests = []
+for c in all_contests:
+    c["Priority"] = score_contest(c["Title"])
 
-for site in SITES:
-    try:
-        headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(site, headers=headers, timeout=10)
-        if response.status_code != 200:
-            print(f"Failed to fetch {site}")
-            continue
+# Sort by priority
+all_contests.sort(key=lambda x: x["Priority"], reverse=True)
 
-        # Very simple scraping: look for <a href=""> links
-        links = response.text.split("<a ")
-        for link in links[1:]:
-            if "href=" not in link:
-                continue
-            parts = link.split("href=")
-            url_part = parts[1].split(">")[0].strip(' "\'')
-            text_part = parts[1].split(">")[1].split("<")[0].strip()
+# Display contests in a nice table
+if all_contests:
+    df = pd.DataFrame(all_contests)
+    df["Link"] = df.apply(lambda row: f"[Link]({row['Link']})", axis=1)
+    df = df[["Source", "Title", "Link", "Priority"]]
+    st.markdown(f"### Found {len(df)} Canadian contests:")
+    st.dataframe(df, use_container_width=True)
+else:
+    st.info("No contests found. Try changing the filter or check back later!")
 
-            if not url_part.lower().startswith("http"):
-                continue
-            if any(bad in text_part.lower() for bad in BAD_KEYWORDS):
-                continue
-            if "canada" not in text_part.lower():
-                continue
-            if url_part in existing_urls:
-                continue
-
-            contests.append((text_part, url_part))
-            existing_urls.add(url_part)
-    except Exception as e:
-        print(f"Error fetching {site}: {e}")
-
-# Sort by prize score
-contests.sort(key=lambda x: score_contest(x[0]), reverse=True)
-
-# Append to output file
-with open(OUTPUT_FILE, "a", encoding="utf-8") as f:
-    f.write(f"\n🎯 Found {len(contests)} new contests ({datetime.now().strftime('%Y-%m-%d')}):\n\n")
-    for title, url in contests:
-        f.write(f"• [{url}] {title}\n   {url}\n\n")
-
-print(f"💾 Saved {len(contests)} new contests to {OUTPUT_FILE}")
+# Optional: save to a file
+if st.button("Save contests to CSV"):
+    pd.DataFrame(all_contests).to_csv("canadian_contests.csv", index=False)
+    st.success("Saved contests to canadian_contests.csv")
