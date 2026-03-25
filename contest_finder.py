@@ -1,15 +1,17 @@
 import streamlit as st
 
-# Make sure the path points to the same folder
-file_path = "canada_contests.txt"
+file_path = "canada_contests.txt"  # Make sure this is exact
 
 contests = []
-with open(file_path, "r", encoding="utf-8") as f:
-    for line in f:
-        parts = line.strip().split("|")
-        if len(parts) == 3:
-            name, description, url = parts
-            contests.append({"name": name, "description": description, "url": url})
+try:
+    with open(file_path, "r", encoding="utf-8") as f:
+        for line in f:
+            parts = line.strip().split("|")
+            if len(parts) == 3:
+                name, description, url = parts
+                contests.append({"name": name, "description": description, "url": url})
+except FileNotFoundError:
+    st.error(f"File not found: {file_path}")
 
 st.title("🎯 Canadian Contest Finder")
 st.write(f"Found {len(contests)} Canadian contests:")
