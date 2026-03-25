@@ -1,74 +1,80 @@
 # contest_finder.py
-
-import streamlit as st
 import requests
 from bs4 import BeautifulSoup
-from datetime import datetime
+import streamlit as st
+import pandas as pd
 
-# -----------------------------
-# Configuration
-# -----------------------------
+st.set_page_config(page_title="Canadian Contest Finder", layout="wide")
+st.title("🎯 Canadian Contest Finder")
 
-# Replace these with real Canadian contest URLs
-CONTEST_SITES = [
-    "https://www.redflagdeals.com/forums/forumdisplay.php?f=51",  # giveaways forum
-    "https://www.canadiangiveawayblog.com"  # example blog
-]
+# --- SOURCES ---
+sources = {
+    "Canadian Free Stuff": "https://www.canadianfreestuff.com/canadian-contests/",
+    "Contest Scoop": "https://www.contestscoop.com/canadian-contests/",
+    "Reddit Sweepstakes": "https://www.reddit.com/r/sweepstakes/.json",
+    "Gleam": "https://gleam.io",
+    "Kingsumo": "https://kingsumo.com",
+}
 
-OUTPUT_FILE = "canada_contests_all_sites.txt"
+# Keywords for scoring big prizes
+priority_keywords = ["$1000", "$500", "$2500", "vacation", "trip", "airplane", "electronics", "PS5", "Xbox", "MacBook", "iPhone"]
 
-# -----------------------------
-# Functions
-# -----------------------------
-
-def fetch_contests(url):
-    """Fetch contest titles from a site. Returns list of strings or None on failure."""
-    try:
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-    except requests.RequestException as e:
-        st.warning(f"Failed to fetch {url}: {e}")
-        return None
-
-    soup = BeautifulSoup(response.text, "lxml")
+# Function to fetch and parse contests from a URL
+def fetch_contests(url, source_name):
     contests = []
-
-    # Try to grab <a> tags with relevant keywords
-    for link in soup.find_all("a"):
-        text = link.get_text(strip=True)
-        if text and ("contest" in text.lower() or "giveaway" in text.lower()):
-            contests.append(text)
-
+    try:
+        if "reddit" in url:
+            headers = {"User-Agent": "Mozilla/5.0"}
+            r = requests.get(url, headers=headers)
+            r.raise_for_status()
+            data = r.json()
+            for post in data["data"]["children"]:
+                title = post["data"]["title"]
+                link = post["data"]["url"]
+                if "canada" in title.lower():
+                    contests.append((source_name, title, link))
+        else:
+            r = requests.get(url)
+            r.raise_for_status()
+            soup = BeautifulSoup(r.text, "html.parser")
+            for a in soup.find_all("a", href=True):
+                text = a.get_text(strip=True)
+                href = a["href"]
+                if "canada" in text.lower() and href.startswith("http"):
+                    contests.append((source_name, text, href))
+    except Exception as e:
+        st.warning(f"Failed to fetch {source_name}: {e}")
     return contests
 
-def save_contests(contest_list):
-    """Append contests to OUTPUT_FILE with timestamp."""
-    if not contest_list:
-        return
+# Function to score contests by priority
+def score_contest(title):
+    score = sum(1 for kw in priority_keywords if kw.lower() in title.lower())
+    return score
 
-    with open(OUTPUT_FILE, "a", encoding="utf-8") as f:
-        for contest in contest_list:
-            f.write(f"{datetime.now().isoformat()} - {contest}\n")
+# --- MAIN SCRAPER ---
+all_contests = []
 
-# -----------------------------
-# Streamlit App
-# -----------------------------
+for name, url in sources.items():
+    contests = fetch_contests(url, name)
+    all_contests.extend(contests)
 
-st.title("Canadian Contest Finder")
-st.write("Collects contests from multiple Canadian websites.")
+if all_contests:
+    # Build dataframe
+    df = pd.DataFrame(all_contests, columns=["Source", "Title", "Link"])
+    df["Score"] = df["Title"].apply(score_contest)
+    df = df.sort_values(by="Score", ascending=False)
 
-if st.button("Fetch Contests"):
-    total_found = 0
-    for site in CONTEST_SITES:
-        st.info(f"Fetching from {site}...")
-        contests = fetch_contests(site)
-        if contests:
-            total_found += len(contests)
-            st.success(f"Found {len(contests)} contests on {site}")
-            save_contests(contests)
-            for c in contests:
-                st.write(f"- {c}")
-        else:
-            st.error(f"No contests found or failed to fetch {site}")
+    st.markdown(f"### Found {len(df)} Canadian contests:")
 
-    st.write(f"Total contests found this run: {total_found}")
+    # Display as clickable links
+    def make_clickable(url, text):
+        return f'<a href="{url}" target="_blank">{text}</a>'
+
+    df_display = df.copy()
+    df_display["Title"] = df_display.apply(lambda x: make_clickable(x["Link"], x["Title"]), axis=1)
+    st.write(
+        df_display[["Source", "Title", "Score"]].to_html(escape=False, index=False),
+        unsafe_allow_html=True
+    )
+else:
+    st.info("No Canada contests found!")
